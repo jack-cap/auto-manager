@@ -249,6 +249,9 @@ When documents (receipts, invoices) are uploaded:
 - Backend API: http://localhost:8000
 - API Documentation: http://localhost:8000/api/docs
 
+> Tip: 
+> To verify your Manager.io connection settings before starting the full app, run the test script: python backend/scripts/test_manager_io_api.py.
+
 ## LLM Configuration
 
 The application supports multiple LLM providers through LiteLLM:
@@ -283,6 +286,40 @@ Key API patterns:
 - **List endpoints**: `GET /suppliers`, `GET /payments`, etc.
 - **Form endpoints**: `POST /supplier-form` (create), `GET /supplier-form/{key}` (read)
 - **Report endpoints**: Two-step - POST form to get key, then GET view with key
+
+## Verified API Payloads
+
+While the Multi-Agent system supports a wide range of actions, the following specific API payloads have been unit-tested against the Manager.io local instance.
+
+### 1. General Ledger & Reporting
+To generate financial statements (P&L, Balance Sheet), the agent will collect the general ledger summary and group the relevant accounting items.
+
+2. Purchase Cycle (Invoice + Payment)
+A. Create Purchase Invoice Endpoint
+B. Make Payment (Linked to Invoice) Endpoint
+
+3. Expense Claim
+Used for out-of-pocket expenses by employees/directors.
+
+Note on Untested Payloads: 
+Other functions (Inventory Transfers, Fixed Asset depreciation, etc.) are implemented in the ENTRY agent based on standard Manager.io API patterns but have not yet been tested with live payloads.
+
+## Usage Guide
+
+- Access the Dashboard: Open http://localhost:3000.
+
+- Connect Manager.io: Ensure your .env credentials are correct. The dashboard will show your current connection status.
+
+- Chat & Upload:
+
+   - Navigate to the Chat tab.
+
+   - Click the Paperclip Icon to upload a receipt (PDF/Image).
+
+   - Prompt the AI: Type instructions like "Process this invoice" or "Book this receipt as a travel expense for John".
+
+   - Review: The AI will extract details, find the matching UUIDs, and confirm when the entry is posted to Manager.io.
+
 
 ## License
 
