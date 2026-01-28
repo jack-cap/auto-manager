@@ -327,6 +327,6 @@ MIT
 
 ## Legal Disclaimer
 
-This project is an unofficial automation tool and is not affiliated with, endorsed by, or connected to Manager.io (NGS Software Pty Ltd). 
+This project is an unofficial automation tool and is not affiliated with, endorsed by, or connected to Manager.io. 
 
 "Manager.io" is a trademark of its respective owner. This software uses the Manager.io API to interact with your self-hosted instance. Users are responsible for ensuring their use complies with Manager.io's terms of service.
