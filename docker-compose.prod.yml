@@ -1,0 +1,39 @@
+# Docker Compose production overrides for Auto Manager
+# Validates: Requirements 10.1, 10.2, 10.3
+#
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file overrides development settings for production deployment.
+# Make sure to set all required environment variables in .env file.
+
+services:
+  frontend:
+    build:
+      target: production
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    environment:
+      - NODE_ENV=production
+    volumes: []  # Remove volume mounts in production
+    restart: always
+
+  backend:
+    build:
+      target: production
+    environment:
+      - DEBUG=false
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://automanager:automanager@db:5432/automanager}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+    volumes: []  # Remove volume mounts in production
+    restart: always
+
+  db:
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-automanager}
+    restart: always
+
+  redis:
+    restart: always
