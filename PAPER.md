@@ -56,7 +56,7 @@ We introduce a verification layer that acts as a firewall between the **Probabil
 
 The digitalization of financial services is shifting from deterministic rules-based systems (ERPs) to probabilistic automation via Generative AI. LLMs promise to automate the "last mile" of bookkeeping—interpreting unstructured data like vendor emails and receipts—which has stubbornly resisted traditional automation.
 
-However, the dominant "Model-as-a-Service" paradigm (e.g., GPT-4, Claude 3.5) necessitates transmitting sensitive general ledgers to third-party clouds, creating vectors for Personally Identifiable Information (PII) leakage and violating data sovereignty mandates such as the EU AI Act or GDPR.
+However, the dominant "Model-as-a-Service" paradigm (e.g., GPT-5.2, Claude 4.5) necessitates transmitting sensitive general ledgers to third-party clouds, creating vectors for Personally Identifiable Information (PII) leakage and violating data sovereignty mandates such as the EU AI Act or GDPR.
 
 This paper proposes a **Local-First Architecture** that shifts inference to the edge. We present Auto Manager, a proof-of-concept system that explores the feasibility of using quantized (Dettmers et al., 2022) Small Language Models (SLMs) to perform accounting tasks without data ever leaving the user's infrastructure.
 
@@ -291,7 +291,7 @@ To make stronger claims, the following experiments would be needed:
 | Claim | Required Evidence |
 |-------|-------------------|
 | "Reduced hallucination" | Error rate comparison: with/without sequential constraints |
-| "Better than cloud" | Accuracy comparison: local SLM vs GPT-4/Claude on same tasks |
+| "Better than cloud" | Accuracy comparison: local SLM vs GPT-5/Claude on same tasks |
 | "Semantic > String matching" | Account categorization accuracy on labeled dataset |
 | "Production ready" | Long-term reliability metrics, edge case coverage |
 

@@ -1,59 +1,39 @@
 # Auto Manager
 
-AI-powered bookkeeping automation for Manager.io using LangGraph agents, FastAPI, and Next.js.
+> **Trust the System, Not the Prediction.**
 
-## Overview
+Privacy-preserving AI bookkeeping automation using local LLMs. Process receipts and invoices without sending your financial data to the cloud.
 
-This application integrates with Manager.io ([self-hosted accounting software](https://www.manager.io/server-edition)) to automate document processing. Users upload financial documents (receipts, invoices), and an AI agent extracts data, categorizes expenses, identifies suppliers, and posts entries to Manager.io.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Paper](https://img.shields.io/badge/Paper-PAPER.md-blue)](PAPER.md)
 
-## Tech Stack
+## Why Auto Manager?
 
-- **Frontend**: Next.js 14+ with TypeScript and Tailwind CSS
-- **Backend**: FastAPI with Python 3.11+
-- **Database**: PostgreSQL (production) / SQLite (development)
-- **Cache**: Redis
-- **AI/ML**: LangGraph multi-agent system with LiteLLM for model routing
-- **OCR**: chandra_ocr vision model via LMStudio
+Cloud AI services like GPT-5.2 and Claude are powerful, but they require sending your sensitive financial data to third-party servers. For businesses handling confidential ledgers, this creates unacceptable privacy and compliance risks (GDPR, EU AI Act).
 
-## Project Structure
+**Auto Manager runs entirely on your hardware.** Your invoices, receipts, and general ledger never leave your infrastructure.
 
-```
-├── frontend/           # Next.js TypeScript frontend
-│   ├── app/           # Next.js App Router pages
-│   ├── components/    # React components
-│   ├── lib/           # Utility libraries and API client
-│   └── types/         # TypeScript type definitions
-├── backend/           # FastAPI Python backend
-│   ├── app/
-│   │   ├── api/       # API route handlers
-│   │   ├── core/      # Configuration and utilities
-│   │   ├── models/    # Database and Pydantic models
-│   │   └── services/  # Business logic services
-│   └── tests/         # Backend tests
-├── docker-compose.yml # Development environment
-└── .env.example       # Environment variable template
-```
+### Key Features
 
-## Multi-Agent Architecture
+- 🔒 **100% Local Inference** - All AI processing happens on your machine via LMStudio/Ollama
+- 📄 **Document Processing** - Upload receipts/invoices, AI extracts and categorizes automatically  
+- 🤖 **Multi-Agent Architecture** - Specialized agents for different accounting tasks
+- ✅ **Validation Layer** - Pydantic schemas catch errors before they hit your ledger
+- 🔗 **Manager.io Integration** - Direct API integration with self-hosted Manager.io
 
-The bookkeeping assistant uses a **LangGraph-based multi-agent system** with a supervisor routing pattern. This architecture provides focused toolsets for each domain, improving LLM performance and reducing context confusion.
-
-### Agent Overview
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         SUPERVISOR                              │
 │  Routes requests to specialized agents based on intent          │
-│  Keywords: DIRECT, DATA, REPORT, TRANSACTION, INVENTORY,        │
-│            INVESTMENT, DOCUMENT, ENTRY                          │
 └─────────────────────────────────────────────────────────────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
         ▼                     ▼                     ▼
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
 │    DIRECT     │   │     DATA      │   │    REPORT     │
-│  No tools     │   │  Master data  │   │  Financial    │
-│  Simple Q&A   │   │  queries      │   │  reports      │
+│  Simple Q&A   │   │  Master data  │   │  Financials   │
 └───────────────┘   └───────────────┘   └───────────────┘
         
         ┌─────────────────────┼─────────────────────┐
@@ -61,272 +41,171 @@ The bookkeeping assistant uses a **LangGraph-based multi-agent system** with a s
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
 │  TRANSACTION  │   │   INVENTORY   │   │  INVESTMENT   │
 │  Query txns   │   │  Stock mgmt   │   │  Portfolio    │
-│  payments,    │   │  goods,       │   │  tracking,    │
-│  receipts     │   │  transfers    │   │  forex        │
 └───────────────┘   └───────────────┘   └───────────────┘
 
         ┌─────────────────────┴─────────────────────┐
         ▼                                           ▼
-┌───────────────┐                         ┌───────────────┐
-│   DOCUMENT    │                         │     ENTRY     │
-│  OCR extract  │                         │  Create/edit  │
-│  classify     │                         │  entries      │
-└───────────────┘                         └───────────────┘
+┌───────────────┐                         ┌────────────────┐
+│   DOCUMENT    │                         │      ENTRY     │
+│  OCR/classify │                         │ Create entries │
+└───────────────┘                         └────────────────┘
 ```
 
-### Agent Details
+The system uses a **Supervisor-Worker pattern** built on LangGraph. Each agent has focused tools for its domain, preventing context pollution and improving reliability.
 
-| Agent | Purpose | Key Tools |
-|-------|---------|-----------|
-| **DIRECT** | Simple Q&A, greetings, follow-up questions | None (direct LLM response) |
-| **DATA** | Query master data | `get_chart_of_accounts`, `get_suppliers`, `get_customers`, `get_bank_accounts`, `get_employees`, `get_tax_codes`, `get_projects`, `get_fixed_assets`, `get_current_context` |
-| **REPORT** | Financial reports | `get_balance_sheet`, `get_profit_and_loss`, `get_trial_balance`, `get_general_ledger_summary`, `get_cash_flow_statement`, `get_aged_receivables`, `get_aged_payables` |
-| **TRANSACTION** | Query transactions | `get_recent_transactions`, `get_payments`, `get_receipts`, `get_expense_claims`, `get_purchase_invoices`, `get_sales_invoices`, `get_credit_notes`, `get_debit_notes` |
-| **INVENTORY** | Inventory management | `get_inventory_items`, `get_inventory_kits`, `get_goods_receipts`, `get_delivery_notes`, `create_goods_receipt`, `create_inventory_write_off`, `create_inventory_transfer` |
-| **INVESTMENT** | Investment tracking | `get_investments`, `get_investment_transactions`, `get_investment_market_prices`, `create_investment_account`, `handle_forex` |
-| **DOCUMENT** | Document processing | `classify_document`, `extract_document_fields`, `search_supplier`, `search_account`, `match_vendor_to_supplier` |
-| **ENTRY** | Create/modify entries | `search_employee`, `search_account`, `get_bank_accounts`, `create_supplier`, `create_customer`, `create_expense_claim`, `create_purchase_invoice`, `create_sales_invoice`, `create_payment`, `create_receipt`, `create_journal_entry`, `create_transfer`, `create_credit_note`, `create_debit_note`, `amend_entry`, `delete_entry`, `extract_fields_from_ocr` |
+## Tech Stack
 
-### Entry Creation Workflows
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 14+, TypeScript, Tailwind CSS |
+| **Backend** | FastAPI, Python 3.11+ |
+| **Orchestration** | LangGraph |
+| **Inference** | LMStudio / Ollama (GLM 4.7 Flash recommended) |
+| **OCR** | Chandra vision model |
+| **Validation** | Pydantic |
+| **Accounting** | Manager.io (self-hosted) |
 
-The ENTRY agent handles all accounting entry creation with proper double-entry bookkeeping:
-
-#### Expense Claim (Employee Reimbursement)
-```
-DR: Expense account (e.g., Meals, Transportation)
-CR: Amount due to employee/director
-
-Tool: create_expense_claim(payer_key, date, description, account_key, amount)
-Note: NO supplier needed - this is for employee out-of-pocket expenses
-```
-
-#### Purchase Invoice (Bill from Supplier)
-```
-DR: Expense or Asset account
-CR: Accounts Payable (supplier)
-
-Tool: create_purchase_invoice(supplier_key, date, description, account_key, amount)
-Later: create_payment when paid
-```
-
-#### Payment - Two Modes
-
-**Mode 1: Paying a Purchase Invoice**
-```
-DR: Accounts Payable (clears the liability)
-CR: Bank account
-
-Tool: create_payment(bank_account_key, date, payee, amount, 
-                     supplier_key=X, purchase_invoice_key=Y)
-Note: Do NOT pass account_key - the invoice already recorded the expense
-```
-
-**Mode 2: Direct Payment (no invoice)**
-```
-DR: Expense account
-CR: Bank account
-
-Tool: create_payment(bank_account_key, date, payee, amount, account_key=expense_account)
-```
-
-#### Sales Invoice (Bill to Customer)
-```
-DR: Accounts Receivable (customer)
-CR: Income account
-
-Tool: create_sales_invoice(customer_key, date, description, account_key, amount)
-Later: create_receipt when customer pays
-```
-
-#### Receipt - Two Modes
-
-**Mode 1: Receiving for a Sales Invoice**
-```
-DR: Bank account
-CR: Accounts Receivable (clears the receivable)
-
-Tool: create_receipt(bank_account_key, date, payer, amount,
-                     customer_key=X, sales_invoice_key=Y)
-Note: Do NOT pass account_key - the invoice already recorded the income
-```
-
-**Mode 2: Direct Receipt (no invoice)**
-```
-DR: Bank account
-CR: Income account
-
-Tool: create_receipt(bank_account_key, date, payer, amount, account_key=income_account)
-```
-
-### UUID Lookup Workflow
-
-The ENTRY agent follows a strict sequential workflow:
-
-1. **Search for UUIDs first** - Always call `search_employee`, `search_account`, or `get_bank_accounts` before creating entries
-2. **One tool at a time** - Call one tool, wait for result, then call next (required for local LLMs)
-3. **Semantic account matching** - `search_account` returns the full Chart of Accounts grouped by type; the LLM chooses the best match
-
-Example workflow for expense claim:
-```
-Step 1: search_employee("director") → Get employee UUID
-Step 2: search_account("transportation") → Get full COA, choose best account
-Step 3: create_expense_claim(payer_key=UUID, account_key=UUID, ...)
-```
-
-### Document Processing Flow
-
-When documents (receipts, invoices) are uploaded:
-
-1. **OCR Extraction** - chandra_ocr model extracts text from images/PDFs
-2. **Supervisor Routing** - Detects document markers, routes to ENTRY agent
-3. **Field Extraction** - `extract_fields_from_ocr` parses vendor, amount, date
-4. **UUID Lookup** - Search for employee, account UUIDs
-5. **Entry Creation** - Create appropriate entry (expense claim, invoice, etc.)
-6. **Confirmation** - Summarize created entries, ready for follow-up questions
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- Node.js 20+
 - Python 3.11+
-- Docker and Docker Compose (optional, for containerized development)
-- Redis (for caching)
-- PostgreSQL (for production) or SQLite (for development)
-- LMStudio with chandra_ocr model (for OCR)
+- Node.js 20+
+- [LMStudio](https://lmstudio.ai/) with GLM 4.7 Flash model
+- [Manager.io Server Edition](https://www.manager.io/server-edition) (self-hosted)
+- Docker (optional)
 
-### Development Setup
+### Installation
 
-1. **Clone the repository**
-
-2. **Set up environment variables**
+1. **Clone and configure**
    ```bash
+   git clone https://github.com/jack-cap/auto-manager.git
+   cd auto-manager
    cp .env.example .env
-   # Edit .env with your configuration
+   # Edit .env with your Manager.io API credentials
    ```
 
-3. **Start with Docker Compose** (recommended)
-   
-   Use the provided management script:
+2. **Start with Docker** (recommended)
    ```bash
-   # Start services
    ./docker-manage.sh up
-   
-   # Stop services
-   ./docker-manage.sh down
-   
-   # Clean rebuild (removes images, rebuilds without cache)
-   ./docker-manage.sh rebuild
-   
-   # View logs
-   ./docker-manage.sh logs
    ```
 
-   Or use docker-compose directly:
+   Or manually:
    ```bash
-   docker-compose up -d
-   ```
-
-4. **Backend setup** (manual)
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements-dev.txt
+   # Backend
+   cd backend && python -m venv venv && source venv/bin/activate
+   pip install -r requirements.txt
    uvicorn app.main:app --reload
+
+   # Frontend (new terminal)
+   cd frontend && npm install && npm run dev
    ```
 
-5. **Frontend setup** (manual)
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+3. **Configure LMStudio**
+   - Load `zai-org/glm-4.7-flash` model
+   - Start local server on port 1234
+   - Load `chandra` model for OCR
 
-### Access the Application
+4. **Access the app**
+   - Frontend: http://localhost:3000
+   - API Docs: http://localhost:8000/api/docs
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/api/docs
+## Usage
 
-> Tip: 
-> To verify your Manager.io connection settings before starting the full app, run the test script: python backend/scripts/test_manager_io_api.py.
+1. **Upload a document** - Click the paperclip icon in chat to upload a receipt or invoice
+2. **Give instructions** - "Book this as a travel expense for John" or "Create a purchase invoice"
+3. **Review and confirm** - The AI extracts details, looks up accounts, and creates the entry
+4. **Check Manager.io** - Entry appears in your accounting software
 
-## LLM Configuration
+### Example Interaction
 
-The application supports multiple LLM providers through LiteLLM:
-
-- **Local**: Ollama, LMStudio
-- **Cloud**: OpenAI, Anthropic, etc.
-
-Configure your preferred provider in `.env`:
 ```
+User: "I have a receipt from Uber for $45.50 on January 15, paid by the director"
+
+Agent Flow:
+1. search_employee("director") → Gets UUID
+2. search_account("transportation") → Finds "Local taxi or uber" account
+3. create_expense_claim(payer=UUID, account=UUID, amount=45.50)
+
+Response: "Created expense claim for $45.50 (Uber) charged to Local taxi or uber,
+           reimbursable to John Director."
+```
+
+## Configuration
+
+```env
+# LLM Settings
 DEFAULT_LLM_PROVIDER=lmstudio
 DEFAULT_LLM_MODEL=zai-org/glm-4.7-flash
-LMSTUDIO_URL=http://host.docker.internal:1234/v1 #for using docker
-```
+LMSTUDIO_URL=http://localhost:1234/v1
 
-For OCR, ensure LMStudio is running with the chandra model loaded:
-```
+# Manager.io
+MANAGER_API_URL=https://your-manager-instance/api2
+MANAGER_API_KEY=your-api-key
+
+# OCR
 OCR_MODEL=chandra
 ```
 
-### Local LLM Notes
+## Documentation
 
-When using local LLMs (e.g., glm-4.7-flash via LMStudio):
-- Tool calls are processed **one at a time** (parallel tool calls may fail)
-- The ENTRY agent prompt enforces sequential tool calling
-- Larger context models (32K+) work better for complex multi-document processing
+- **[PAPER.md](PAPER.md)** - Technical paper describing the architecture, methodology, and design decisions
+- **[Manager.io API Reference](.kiro/steering/manager-io-api.md)** - API patterns and tested payloads
 
-## Manager.io API Integration
+## How It Works
 
-The application integrates with Manager.io's REST API. See https://manager.readme.io/ for full api references.
+### The "Trust the System" Philosophy
 
-Key API patterns:
-- **List endpoints**: `GET /suppliers`, `GET /payments`, etc.
-- **Form endpoints**: `POST /supplier-form` (create), `GET /supplier-form/{key}` (read)
-- **Report endpoints**: Two-step - POST form to get key, then GET view with key
+LLMs are probabilistic—they make mistakes. Instead of hoping the model gets it right, we build guardrails:
 
-## Verified API Payloads
+1. **Sequential Tool Execution** - One tool call at a time, wait for result, then proceed (prevents hallucinated UUIDs)
+2. **Mandatory Lookups** - Agent must search for employee/account UUIDs before creating entries
+3. **Pydantic Validation** - All payloads validated against strict schemas before API calls
+4. **Loop Detection** - Terminates if same tool called repeatedly (prevents infinite loops)
 
-While the Multi-Agent system supports a wide range of actions, the following specific API payloads have been unit-tested against the Manager.io local instance.
+### Why Local LLMs Work
 
-### 1. General Ledger & Reporting
-To generate financial statements (P&L, Balance Sheet), the agent will collect the general ledger summary and group the relevant accounting items.
+Modern Small Language Models (SLMs) like GLM 4.7 Flash can handle complex reasoning when properly constrained. The key insights:
 
-2. Purchase Cycle (Invoice + Payment)
-A. Create Purchase Invoice Endpoint
-B. Make Payment (Linked to Invoice) Endpoint
+- **Constrained action space** - Focused tools per agent reduces confusion
+- **Semantic matching** - LLM chooses accounts from full Chart of Accounts (handles "audit fee" ≈ "professional fees")
+- **Quantization** - 8-bit inference enables running on consumer hardware (24GB+ RAM recommended)
 
-3. Expense Claim
-Used for out-of-pocket expenses by employees/directors.
+## Limitations
 
-Note on Untested Payloads: 
-Other functions (Inventory Transfers, Fixed Asset depreciation, etc.) are implemented in the ENTRY agent based on standard Manager.io API patterns but have not yet been tested with live payloads.
+- Requires 24GB+ RAM for optimal performance
+- Tightly coupled to Manager.io API structure
+- Local LLMs process one tool call at a time (slower than cloud)
+- Not tested for production workloads—use at your own risk
 
-## Usage Guide
+## Contributing
 
-- Access the Dashboard: Open http://localhost:3000.
+Contributions welcome! Areas of interest:
 
-- Connect Manager.io: Ensure your .env credentials are correct. The dashboard will show your current connection status.
-
-- Chat & Upload:
-
-   - Navigate to the Chat tab.
-
-   - Click the Paperclip Icon to upload a receipt (PDF/Image).
-
-   - Prompt the AI: Type instructions like "Process this invoice" or "Book this receipt as a travel expense for John".
-
-   - Review: The AI will extract details, find the matching UUIDs, and confirm when the entry is posted to Manager.io.
-
+- Bank reconciliation automation
+- Additional accounting software integrations
+- Performance benchmarking vs cloud LLMs
+- Test coverage improvements
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE)
 
-## Legal Disclaimer
+## Acknowledgments
 
-This project is an unofficial automation tool and is not affiliated with, endorsed by, or connected to Manager.io. 
+This project builds on excellent open-source work:
 
-"Manager.io" is a trademark of its respective owner. This software uses the Manager.io API to interact with your self-hosted instance. Users are responsible for ensuring their use complies with Manager.io's terms of service.
+- **[LangGraph](https://github.com/langchain-ai/langgraph)** - State machine orchestration for LLM applications
+- **[Chandra](https://github.com/datalab-to/chandra)** ([HuggingFace](https://huggingface.co/datalab-to/chandra)) - Layout-aware document OCR model
+- **[LMStudio](https://lmstudio.ai/)** - Local LLM inference server
+- **[Ollama](https://ollama.com/)** - Run LLM on locally
+- **[GLM-4.7-Flash](https://z.ai/blog/glm-4.7)** - The foundation model powering our agents ([HuggingFace](https://huggingface.co/zai-org/GLM-4.7-Flash))
+
+## Disclaimer
+
+This project is an independent, open-source implementation. It is **not affiliated with, endorsed by, or connected to Manager.io**. "Manager.io" is a trademark of its respective owner. Users are responsible for ensuring compliance with Manager.io's terms of service.
+
+---
+
+**Author:** Chun Kit, NG  
+**Repository:** https://github.com/jack-cap/auto-manager
