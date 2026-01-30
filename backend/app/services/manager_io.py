@@ -2918,11 +2918,21 @@ class ManagerIOClient:
             elif "Balance" in record or "balance" in record:
                 balance = float(record.get("Balance") or record.get("balance") or 0)
             
+            key_val = record.get("key") or record.get("Key") or ""
+            name_val = record.get("name") or record.get("Name") or "Unknown"
+            currency_val = record.get("actualBalance", {}).get("currency", "USD") if isinstance(record.get("actualBalance"), dict) else "USD"
+            
             normalized.append({
-                "Key": record.get("key") or record.get("Key") or "",
-                "Name": record.get("name") or record.get("Name") or "Unknown",
+                # Uppercase keys (primary)
+                "Key": key_val,
+                "Name": name_val,
                 "Balance": balance,
-                "Currency": record.get("actualBalance", {}).get("currency", "USD") if isinstance(record.get("actualBalance"), dict) else "USD",
+                "Currency": currency_val,
+                # Lowercase keys (for compatibility)
+                "key": key_val,
+                "name": name_val,
+                "balance": balance,
+                "currency": currency_val,
                 "_raw": record,  # Keep raw data for debugging
             })
         

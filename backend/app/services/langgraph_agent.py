@@ -1202,11 +1202,13 @@ def create_entry_tools(manager_client=None) -> List[BaseTool]:
             if hasattr(acc, 'name'):
                 acc_name, acc_key = acc.name, acc.key
             else:
-                acc_name, acc_key = acc.get("name", ""), acc.get("key", "")
+                # manager_io.py returns normalized records with uppercase keys (Key, Name)
+                acc_name = acc.get("Name") or acc.get("name") or ""
+                acc_key = acc.get("Key") or acc.get("key") or ""
             if name_lower in acc_name.lower() or acc_name.lower() in name_lower:
                 return acc_key, ""
         
-        available = [a.name if hasattr(a, 'name') else a.get('name', '') for a in account_list[:10]]
+        available = [a.name if hasattr(a, 'name') else (a.get('Name') or a.get('name') or '') for a in account_list[:10]]
         return "", f"Could not find bank account matching '{name_or_key}'. Available: {available}"
     
     # Helper function to lookup supplier by name
@@ -2073,9 +2075,11 @@ def create_entry_tools(manager_client=None) -> List[BaseTool]:
                     bank_key = bank.key
                     balance = getattr(bank, 'actualBalance', None)
                 else:
-                    bank_name = bank.get("name", "")
-                    bank_key = bank.get("key", "")
-                    balance = bank.get("actualBalance", None)
+                    # manager_io.py returns normalized records with uppercase keys (Key, Name, Balance)
+                    # Also check lowercase for raw API responses
+                    bank_name = bank.get("Name") or bank.get("name") or ""
+                    bank_key = bank.get("Key") or bank.get("key") or ""
+                    balance = bank.get("Balance") or bank.get("actualBalance")
                 
                 bank_info = {"key": bank_key, "name": bank_name}
                 if balance:
