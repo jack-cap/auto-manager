@@ -687,12 +687,19 @@ class ManagerIOClient:
             params: Optional query parameters
             
         Returns:
-            Response JSON data
+            Response JSON data, or empty dict if response has no body
         """
         response = await self._request_with_retry(
             "PUT", endpoint, params=params, json_data=data
         )
-        return response.json()
+        # Handle empty responses (204 No Content or empty body)
+        if response.status_code == 204 or not response.content:
+            return {"success": True}
+        try:
+            return response.json()
+        except Exception:
+            # If JSON parsing fails, return success indicator
+            return {"success": True, "status_code": response.status_code}
     
     # =========================================================================
     # Pagination Helper
@@ -1546,13 +1553,14 @@ class ManagerIOClient:
     ) -> UpdateResponse:
         """Update an existing entry in Manager.io.
         
-        Updates an entry by its type and ID. The data dictionary should contain
-        the fields to update in Manager.io API format.
+        This method performs a MERGE update - it fetches the existing entry,
+        merges the provided updates, and then saves the complete entry.
+        This prevents data loss when only updating specific fields.
         
         Args:
             entry_type: Type of entry (e.g., "expense-claim-form", "purchase-invoice-form")
             entry_id: Entry UUID
-            data: Updated entry data in Manager.io API format
+            data: Fields to update in Manager.io API format (will be merged with existing)
             
         Returns:
             UpdateResponse with success status
@@ -1585,7 +1593,19 @@ class ManagerIOClient:
         endpoint = f"/{entry_type.lstrip('/')}/{entry_id}"
         
         try:
-            await self._put(endpoint, data)
+            # IMPORTANT: First fetch the existing entry to preserve all fields
+            existing_data = await self._get(endpoint)
+            
+            # Remove read-only fields that shouldn't be sent back
+            read_only_fields = {"Key", "key", "View", "view", "Edit", "edit"}
+            for field in read_only_fields:
+                existing_data.pop(field, None)
+            
+            # Merge updates into existing data (updates take precedence)
+            merged_data = {**existing_data, **data}
+            
+            # PUT the merged data
+            await self._put(endpoint, merged_data)
             
             return UpdateResponse(
                 success=True,

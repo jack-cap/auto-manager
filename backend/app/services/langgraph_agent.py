@@ -542,26 +542,27 @@ def create_transaction_tools(manager_client=None) -> List[BaseTool]:
         return "Client not configured"
     
     @tool
-    async def get_expense_claims(limit: int = 30) -> str:
+    async def get_expense_claims(limit: int = 200) -> str:
         """Get expense claims (money OUT - employee expenses to be reimbursed).
         
         Expense claims are costs we incurred, paid by employees, to be reimbursed.
         The 'payee' is who we paid (the vendor/merchant).
         
-        Args: limit"""
+        Args: limit (default 200, increase if needed for bulk operations)
+        
+        Returns: List with key (UUID needed for amend_entry), date, payee, description, amount"""
         if manager_client:
             try:
                 claims = await manager_client.get_expense_claims(skip=0, take=limit)
                 formatted = []
                 for c in claims.items[:limit]:
                     formatted.append({
+                        "key": c.get("key") or c.get("Key"),  # IMPORTANT: Include key for updates
                         "type": "expense_claim",
-                        "direction": "OUT (we paid via employee)",
                         "date": c.get("date") or c.get("Date"),
                         "paid_to": c.get("payee") or c.get("Payee"),
                         "description": c.get("description") or c.get("Description"),
                         "amount": format_amount(c.get("amount") or c.get("Amount")),
-                        "expense_accounts": c.get("accounts") or c.get("Accounts", ""),
                     })
                 return json.dumps(formatted, indent=2)
             except Exception as e:
@@ -1964,16 +1965,99 @@ def create_entry_tools(manager_client=None) -> List[BaseTool]:
     async def amend_entry(
         entry_type: str,
         entry_key: str,
-        updates: str,
+        updates: Union[str, Dict[str, Any]],
     ) -> str:
         """Amend/update an existing entry.
-        Args: entry_type (expense-claim, purchase-invoice, etc), entry_key, updates (JSON of fields to update)"""
+        Args: entry_type (expense-claim, purchase-invoice, receipt, payment, etc), entry_key, updates (dict or JSON string of fields to update)
+        
+        Common field names for expense claims:
+        - PaidBy: UUID of the employee/payer (use search_employee to find)
+        - Date: YYYY-MM-DD format
+        - Payee: Name of vendor/merchant
+        - Description: Description text
+        - Lines: Array of line items
+        """
         if not manager_client:
             return "Error: Manager.io client not configured"
         try:
-            update_data = json.loads(updates)
-            result = await manager_client.update_entry(entry_type, entry_key, update_data)
-            return f"Updated entry: {json.dumps(result)}"
+            # Handle both dict and string inputs
+            if isinstance(updates, str):
+                update_data = json.loads(updates)
+            elif isinstance(updates, dict):
+                update_data = updates
+            else:
+                return f"Error: updates must be a dict or JSON string, got {type(updates)}"
+            
+            # Ensure entry_type has -form suffix for the API
+            api_entry_type = entry_type
+            if not api_entry_type.endswith("-form"):
+                api_entry_type = f"{api_entry_type}-form"
+            
+            result = await manager_client.update_entry(api_entry_type, entry_key, update_data)
+            # Serialize the UpdateResponse object
+            result_dict = {"success": result.success, "message": result.message}
+            return f"Updated entry: {json.dumps(result_dict)}"
+        except json.JSONDecodeError as e:
+            return f"Error parsing updates JSON: {e}"
+        except Exception as e:
+            return f"Error: {e}"
+    
+    @tool
+    async def bulk_amend_entries(
+        entry_type: str,
+        entry_keys: List[str],
+        updates: Union[str, Dict[str, Any]],
+    ) -> str:
+        """Bulk update multiple entries with the same changes. Much faster than calling amend_entry repeatedly.
+        
+        Args:
+            entry_type: expense-claim, purchase-invoice, receipt, payment, etc
+            entry_keys: List of entry UUIDs to update
+            updates: dict or JSON string of fields to update (applied to ALL entries)
+        
+        Example: bulk_amend_entries("expense-claim", ["uuid1", "uuid2", "uuid3"], {"PaidBy": "employee-uuid"})
+        
+        Returns: Summary of successes and failures
+        """
+        if not manager_client:
+            return "Error: Manager.io client not configured"
+        
+        try:
+            # Handle both dict and string inputs
+            if isinstance(updates, str):
+                update_data = json.loads(updates)
+            elif isinstance(updates, dict):
+                update_data = updates
+            else:
+                return f"Error: updates must be a dict or JSON string, got {type(updates)}"
+            
+            # Ensure entry_type has -form suffix for the API
+            api_entry_type = entry_type
+            if not api_entry_type.endswith("-form"):
+                api_entry_type = f"{api_entry_type}-form"
+            
+            successes = []
+            failures = []
+            
+            for entry_key in entry_keys:
+                try:
+                    result = await manager_client.update_entry(api_entry_type, entry_key, update_data)
+                    if result.success:
+                        successes.append(entry_key)
+                    else:
+                        failures.append({"key": entry_key, "error": result.message})
+                except Exception as e:
+                    failures.append({"key": entry_key, "error": str(e)})
+            
+            summary = {
+                "total": len(entry_keys),
+                "succeeded": len(successes),
+                "failed": len(failures),
+                "failures": failures[:10] if failures else [],  # Limit failure details
+            }
+            return f"Bulk update complete: {json.dumps(summary)}"
+        except json.JSONDecodeError as e:
+            return f"Error parsing updates JSON: {e}"
         except Exception as e:
             return f"Error: {e}"
     
@@ -2166,7 +2250,7 @@ def create_entry_tools(manager_client=None) -> List[BaseTool]:
     return [search_employee, search_account, get_bank_accounts, create_supplier, create_customer,
             create_expense_claim, create_purchase_invoice, create_sales_invoice,
             create_payment, create_receipt, create_journal_entry, create_transfer,
-            create_credit_note, create_debit_note, amend_entry, delete_entry,
+            create_credit_note, create_debit_note, amend_entry, bulk_amend_entries, delete_entry,
             extract_fields_from_ocr]
 
 
@@ -2841,10 +2925,11 @@ RULES:
         logger.info(f"[{agent_name}] Agent invoked with {len(tools)} tools: {[t.name for t in tools]}")
         
         # Agent loop - keep calling tools until done
-        max_iterations = 8  # Most tasks complete in 3-5 iterations
+        # Increased to support bulk operations (e.g., updating all expense claims)
+        max_iterations = 150  # Support bulk operations on up to ~100 records
         tool_called = False
         recent_tool_calls = []  # Track recent calls to detect loops
-        max_same_call_repeats = 2  # Stop if same call repeated this many times
+        max_same_call_repeats = 3  # Stop if same call repeated this many times (increased for bulk ops)
         
         for iteration in range(max_iterations):
             logger.info(f"[{agent_name}] Iteration {iteration + 1}/{max_iterations}")
