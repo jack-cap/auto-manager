@@ -1,5 +1,7 @@
 # Auto Manager
 
+> Disclaimer:  This is a proof-of-concept and undergoing further development.  This is far from a complete product.  Use it with caution.  We do not hold accountable to any data loss or inaccuracy.
+
 > **Trust the System, Not the Prediction.**
 
 Privacy-preserving AI bookkeeping automation using local LLMs. Process receipts and invoices without sending your financial data to the cloud.
